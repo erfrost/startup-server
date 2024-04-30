@@ -1,4 +1,4 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Param, Post, Query } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { AuthReturn } from 'interfaces';
@@ -11,6 +11,14 @@ export class AuthController {
   @Post('createUser')
   async createUser(@Body() createUserDto: CreateUserDto): Promise<AuthReturn> {
     return this.authService.createUser(createUserDto);
+  }
+
+  @Post('confirmCode/:user_id')
+  async confirmCode(
+    @Param('user_id') user_id: string,
+    @Query('code') code: string,
+  ): Promise<boolean> {
+    return this.authService.confirmCode(user_id, code);
   }
 
   @Post('signIn')

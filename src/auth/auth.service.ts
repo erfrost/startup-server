@@ -11,6 +11,7 @@ import { TokensDto } from './dto/tokens.dto';
 import { AuthReturn } from 'interfaces';
 import { SignInDto } from './dto/signIn.dto';
 import comparePassword from './../utils/comparePassword';
+import nodemailerInstance from 'nodemailer.config';
 
 @Injectable()
 export class AuthService {
@@ -31,7 +32,7 @@ export class AuthService {
         email,
       },
     });
-    console.log(isExistUser);
+
     if (isExistUser) {
       throw new HttpException(
         'Пользователь с таким email уже зарегистрирован',
@@ -41,13 +42,27 @@ export class AuthService {
 
     const hashedPassword: string = await hashingPassword(password);
 
+    const mailCode: string = Math.floor(
+      10000 + Math.random() * 90000,
+    ).toString();
+
     const userModel = this.userRepository.create({
       nickname,
       email,
       password: hashedPassword,
       role,
+      confirmed: false,
+      confirmationCode: mailCode,
     });
     const newUser = await this.userRepository.save(userModel);
+
+    const message = await nodemailerInstance.sendMail({
+      from: '"SkillGrove. 👻" <dlaskinow@gmail.com>',
+      to: newUser.email,
+      subject: 'SkillGrove. Код подтверждения',
+      text: ``,
+      html: `<span>Код подтверждения: <b>${newUser.confirmationCode}</b></span>`,
+    });
 
     const tokens: TokensDto = this.tokenService.generate({
       user_id: newUser.user_id,
@@ -63,6 +78,34 @@ export class AuthService {
       ...tokens,
       user_id: newUser.user_id,
     };
+  }
+
+  async confirmCode(user_id: string, code: string) {
+    if (!user_id || !code) {
+      throw new HttpException(
+        'Неверные параметры запроса',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const user: User = await this.userRepository.findOne({
+      where: {
+        user_id,
+      },
+    });
+
+    if (!user) {
+      throw new HttpException('Пользователь не найден', HttpStatus.BAD_REQUEST);
+    }
+    if (code !== user.confirmationCode) {
+      return false;
+    }
+
+    user.confirmed = true;
+
+    await this.userRepository.save(user);
+
+    return true;
   }
 
   async signIn(dto: SignInDto): Promise<any> {
